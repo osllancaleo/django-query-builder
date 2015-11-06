@@ -1140,28 +1140,55 @@ class Query(object):
         row_values = []
         sql_args = []
 
+        # for row in rows:
+        #     placeholders = []
+        #     for value in row:
+        #         sql_args.append(value)
+        #         placeholders.append('%s')
+        #     row_values.append('({0})'.format(', '.join(placeholders)))
+        # row_values_sql = ', '.join(row_values)
+        #
+        # build field list for SET portion
+        # set_field_list = [
+        #     '{0} = NULL'.format(field_name)
+        #     if all_null_indices[idx] else '{0} = new_values.{0}'.format(field_name)
+        #     for idx, field_name in enumerate(update_field_names)
+        # ]
+        # set_field_list_sql = ', '.join(set_field_list)
+        #
+        # self.sql = 'UPDATE {0} SET {1} FROM (VALUES {2}) AS new_values {3} WHERE {0}.{4} = new_values.{4}'.format(
+        #     self.tables[0].get_identifier(),
+        #     set_field_list_sql,
+        #     row_values_sql,
+        #     field_names_sql,
+        #     pk
+        # )
+
+        # MySQL Version
+        pk_values = []
         for row in rows:
-            placeholders = []
+            pk_values.append(str(row[0]))
             for value in row:
                 sql_args.append(value)
-                placeholders.append('%s')
-            row_values.append('({0})'.format(', '.join(placeholders)))
+            # row_values.append('({0})'.format(', '.join(placeholders)))
+            row_values.append('WHEN %s THEN %s')
         row_values_sql = ', '.join(row_values)
+        pk_values_sql = ', '.join(pk_values)
 
         # build field list for SET portion
         set_field_list = [
             '{0} = NULL'.format(field_name)
-            if all_null_indices[idx] else '{0} = new_values.{0}'.format(field_name)
+            if all_null_indices[idx] else '{0} = CASE {1} {2} END'.format(field_name, pk, row_values_sql)
             for idx, field_name in enumerate(update_field_names)
         ]
-        set_field_list_sql = ', '.join(set_field_list)
+        set_field_list_sql = ' '.join(set_field_list)
+        set_field_list_sql = set_field_list_sql.replace(",","")
 
-        self.sql = 'UPDATE {0} SET {1} FROM (VALUES {2}) AS new_values {3} WHERE {0}.{4} = new_values.{4}'.format(
+        self.sql = 'UPDATE {0} SET {1}  WHERE {0}.{2} IN ({3})'.format(
             self.tables[0].get_identifier(),
             set_field_list_sql,
-            row_values_sql,
-            field_names_sql,
-            pk
+            pk,
+            pk_values_sql
         )
 
         return self.sql, sql_args
